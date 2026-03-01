@@ -2,56 +2,80 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>211_molite</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0a192f; color: #ccd6f6; display: flex; justify-content: center; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a192f; color: #ccd6f6; display: flex; justify-content: center; margin: 0; min-height: 100vh; }
         .container { width: 100%; max-width: 600px; padding: 20px; }
         .card { background: #112240; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(2,12,27,0.5); }
-        input, textarea { width: 100%; padding: 10px; margin: 8px 0; background: #0a192f; color: white; border: 1px solid #233554; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; border: 1px solid #64ffda; color: #64ffda; background: none; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        
+        input, textarea, select { 
+            width: 100%; padding: 12px; margin: 8px 0; 
+            background: #0a192f; color: white; border: 1px solid #233554; 
+            border-radius: 6px; box-sizing: border-box; font-size: 1rem;
+        }
+
+        button { 
+            width: 100%; padding: 12px; border: 1px solid #64ffda; 
+            color: #64ffda; background: none; cursor: pointer; 
+            font-weight: bold; border-radius: 6px; transition: 0.3s;
+        }
         button:hover { background: rgba(100,255,218,0.1); }
-        .post { background: #112240; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 4px solid #64ffda; position: relative; }
+
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
+        .tab-btn { border-color: #8892b0; color: #8892b0; flex: 1; white-space: nowrap; min-width: 80px; }
+        .tab-btn.active { border-color: #64ffda; color: #64ffda; background: rgba(100,255,218,0.05); }
+
+        .post { background: #112240; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 4px solid #64ffda; }
         .author-name { color: #64ffda; font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; }
-        .post-time { font-size: 0.7rem; color: #8892b0; margin-top: 10px; }
+        .post-time { font-size: 0.75rem; color: #8892b0; margin-top: 10px; }
+        
+        .admin-btn { border: 1px solid #f57d7d; color: #f57d7d; width: auto; padding: 4px 10px; font-size: 0.8rem; margin-top: 10px; }
         .hidden { display: none; }
-        .admin-btn { border-color: #f57d7d; color: #f57d7d; margin-top: 5px; width: auto; font-size: 0.8rem; padding: 5px 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1 style="color: #64ffda; text-align: center;">211_molite</h1>
-    
+    <div id="user-info" style="text-align: center; margin-bottom: 15px;"></div>
+
     <div id="auth-section" class="card">
-        <h3>Вход или Регистрация</h3>
-        <input type="text" id="user-name" placeholder="Твое Имя (для регистрации)">
+        <h3>Вход / Регистрация</h3>
+        <input type="text" id="user-name" placeholder="Имя (для новых)">
         <input type="email" id="email" placeholder="Email">
         <input type="password" id="pass" placeholder="Пароль">
         <div style="display: flex; gap: 10px;">
             <button id="login-btn">Войти</button>
-            <button id="reg-btn">Создать аккаунт</button>
+            <button id="reg-btn" style="border-color: #8892b0; color: #8892b0;">Создать</button>
         </div>
     </div>
 
-    <div id="user-panel" class="card hidden">
-        <div id="welcome-msg" style="margin-bottom: 10px;"></div>
-        <textarea id="post-text" placeholder="Что нового?"></textarea>
-        <button id="send-btn">Опубликовать пост</button>
-        <button id="logout-btn" style="border:none; color:#8892b0; font-size: 0.8rem;">Выйти</button>
-        
-        <div id="admin-tools" class="hidden" style="margin-top: 20px; border-top: 1px solid #233554; padding-top: 10px;">
-            <h4 style="color: #f57d7d;">Управление пользователями</h4>
-            <div id="users-list"></div>
-        </div>
+    <div id="admin-panel" class="card hidden">
+        <h3>Новый пост</h3>
+        <select id="post-category">
+            <option value="news">Молитвы пред судным днём</option>
+            <option value="private">Молитвы по судному дню</option>
+            <option value="archive">Молитвы на каждый день</option>
+        </select>
+        <textarea id="post-text" rows="3" placeholder="Текст..."></textarea>
+        <button id="send-btn">Опубликовать</button>
+        <button id="logout-btn" style="border:none; color:#f57d7d; font-size: 0.8rem; margin-top: 10px;">Выйти</button>
     </div>
 
-    <div id="posts"></div>
+    <div class="tabs">
+        <button id="btn-news" class="tab-btn active" onclick="switchTab('news')">Молитвы <br>пред судным днём</button>
+        <button id="btn-private" class="tab-btn" onclick="switchTab('private')">Молитвы <br>по судному дню</button>
+        <button id="btn-archive" class="tab-btn" onclick="switchTab('archive')">Молитвы<br> на каждый день</button>
+    </div>
+
+    <div id="posts-container"></div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDoc, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDoc, query, where, orderBy, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDwM_poO1R-3JM5DScKOrRHeXinAxQzYjA",
@@ -66,109 +90,76 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Список админов
-// Добавляй сюда любые почты через запятую в кавычках
-const ADMIN_EMAILS = [
-    "malyareinkko162@yandex.ru", 
-    "artemuchoka" 
-];
-    // --- РЕГИСТРАЦИЯ ---
+    const ADMIN_EMAILS = ["malyareinkko162@yandex.ru", "artemochka"]; 
+    let currentTab = 'news';
+    let unsubscribe = null;
+
+    // Регистрация / Вход
     document.getElementById('reg-btn').onclick = async () => {
         const name = document.getElementById('user-name').value.trim();
         const email = document.getElementById('email').value.trim();
-        const pass = document.getElementById('pass').value.trim();
-
-        if (!name || !email || pass.length < 6) {
-            return alert("Заполни все поля! Пароль минимум 6 символов.");
-        }
-
+        const pass = document.getElementById('pass').value;
         try {
             const res = await createUserWithEmailAndPassword(auth, email, pass);
-            // Сразу создаем запись в базе
-            await setDoc(doc(db, "users", res.user.uid), {
-                name: name,
-                email: email,
-                role: ADMIN_EMAILS.includes(email) ? "admin" : "user"
-            });
-            alert("Аккаунт создан!");
-        } catch (e) {
-            if (e.code === 'auth/email-already-in-use') alert("Эта почта уже занята!");
-            else alert("Ошибка: " + e.message);
-        }
+            await setDoc(doc(db, "users", res.user.uid), { name, email });
+        } catch(e) { alert(e.message); }
     };
-
-    // --- ВХОД ---
     document.getElementById('login-btn').onclick = () => {
-        const email = document.getElementById('email').value.trim();
-        const pass = document.getElementById('pass').value.trim();
-        signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Ошибка входа: " + e.message));
+        signInWithEmailAndPassword(auth, document.getElementById('email').value.trim(), document.getElementById('pass').value).catch(e => alert(e.message));
     };
-
-    // --- ВЫХОД ---
     document.getElementById('logout-btn').onclick = () => signOut(auth);
 
-    // --- МОНИТОРИНГ СОСТОЯНИЯ ---
     onAuthStateChanged(auth, async (user) => {
-        const authSec = document.getElementById('auth-section');
-        const userPan = document.getElementById('user-panel');
-        const adminTools = document.getElementById('admin-tools');
-
+        const isAdmin = user && ADMIN_EMAILS.includes(user.email);
+        document.getElementById('auth-section').classList.toggle('hidden', !!user);
+        document.getElementById('admin-panel').classList.toggle('hidden', !isAdmin);
         if (user) {
-            authSec.classList.add('hidden');
-            userPan.classList.remove('hidden');
-            
-            // Получаем имя из базы
             const userDoc = await getDoc(doc(db, "users", user.uid));
-            const name = userDoc.exists() ? userDoc.data().name : "Пользователь";
-            document.getElementById('welcome-msg').innerHTML = `Привет, <b>${name}</b>!`;
-
-            if (ADMIN_EMAILS.includes(user.email)) {
-                adminTools.classList.remove('hidden');
-            }
-        } else {
-            authSec.classList.remove('hidden');
-            userPan.classList.add('hidden');
-            adminTools.classList.add('hidden');
+            document.getElementById('user-info').innerHTML = `Привет, <b>${userDoc.exists() ? userDoc.data().name : "Друг"}</b>`;
         }
+        loadPosts();
     });
 
-    // --- ОТПРАВКА ПОСТА ---
     document.getElementById('send-btn').onclick = async () => {
         const text = document.getElementById('post-text').value.trim();
-        if (!text || !auth.currentUser) return;
-
-        try {
-            const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-            const authorName = userDoc.exists() ? userDoc.data().name : "Аноним";
-
-            await addDoc(collection(db, "posts"), {
-                content: text,
-                author: authorName,
-                time: serverTimestamp()
-            });
-            document.getElementById('post-text').value = "";
-        } catch (e) { alert("Ошибка при публикации!"); }
+        const category = document.getElementById('post-category').value;
+        if(!text) return;
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+        await addDoc(collection(db, "posts"), {
+            content: text, author: userDoc.data().name, category, time: serverTimestamp()
+        });
+        document.getElementById('post-text').value = "";
     };
 
-    // --- ЛЕНТА ПОСТОВ ---
-    onSnapshot(query(collection(db, "posts"), orderBy("time", "desc")), (snap) => {
-        const cont = document.getElementById('posts');
-        cont.innerHTML = "";
-        snap.forEach(s => {
-            const p = s.data();
-            const isAdmin = auth.currentUser && ADMIN_EMAILS.includes(auth.currentUser.email);
-            const date = p.time ? p.time.toDate().toLocaleString() : "...";
-            cont.innerHTML += `
-                <div class="post">
-                    <div class="author-name">${p.author}</div>
-                    <div>${p.content}</div>
-                    <div class="post-time">${date}</div>
-                    ${isAdmin ? `<button class="admin-btn" onclick="deletePost('${s.id}')">Удалить</button>` : ""}
-                </div>`;
+    window.switchTab = (tab) => {
+        currentTab = tab;
+        ['news', 'private', 'archive'].forEach(t => {
+            document.getElementById('btn-' + t).classList.toggle('active', t === tab);
         });
-    });
+        loadPosts();
+    };
 
-    window.deletePost = (id) => { if(confirm("Удалить пост?")) deleteDoc(doc(db, "posts", id)); };
+    function loadPosts() {
+        if (unsubscribe) unsubscribe();
+        const q = query(collection(db, "posts"), where("category", "==", currentTab), orderBy("time", "desc"));
+        unsubscribe = onSnapshot(q, (snap) => {
+            const cont = document.getElementById('posts-container');
+            cont.innerHTML = "";
+            snap.forEach(docSnap => {
+                const p = docSnap.data();
+                const isAdmin = auth.currentUser && ADMIN_EMAILS.includes(auth.currentUser.email);
+                cont.innerHTML += `<div class="post">
+                    <div class="author-name">${p.author}</div>
+                    <div style="white-space: pre-wrap;">${p.content}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="post-time">${p.time ? p.time.toDate().toLocaleString() : "..."}</span>
+                        ${isAdmin ? `<button class="admin-btn" onclick="deletePost('${docSnap.id}')">Удалить</button>` : ""}
+                    </div>
+                </div>`;
+            });
+        });
+    }
+    window.deletePost = (id) => { if(confirm("Удалить?")) deleteDoc(doc(db, "posts", id)); };
 </script>
 </body>
 </html>
