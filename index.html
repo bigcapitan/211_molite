@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>211_molite</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0a192f; color: #ccd6f6; display: flex; justify-content: center; margin: 0; }
+        .container { width: 100%; max-width: 600px; padding: 20px; }
+        .card { background: #112240; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(2,12,27,0.5); }
+        input, textarea { width: 100%; padding: 10px; margin: 8px 0; background: #0a192f; color: white; border: 1px solid #233554; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; border: 1px solid #64ffda; color: #64ffda; background: none; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        button:hover { background: rgba(100,255,218,0.1); }
+        .post { background: #112240; padding: 15px; border-radius: 10px; margin-bottom: 15px; border-left: 4px solid #64ffda; position: relative; }
+        .author-name { color: #64ffda; font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; }
+        .post-time { font-size: 0.7rem; color: #8892b0; margin-top: 10px; }
+        .hidden { display: none; }
+        .admin-btn { border-color: #f57d7d; color: #f57d7d; margin-top: 5px; width: auto; font-size: 0.8rem; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="color: #64ffda; text-align: center;">211_molite</h1>
+    
+    <div id="auth-section" class="card">
+        <h3>Вход или Регистрация</h3>
+        <input type="text" id="user-name" placeholder="Твое Имя (для регистрации)">
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="pass" placeholder="Пароль">
+        <div style="display: flex; gap: 10px;">
+            <button id="login-btn">Войти</button>
+            <button id="reg-btn">Создать аккаунт</button>
+        </div>
+    </div>
+
+    <div id="user-panel" class="card hidden">
+        <div id="welcome-msg" style="margin-bottom: 10px;"></div>
+        <textarea id="post-text" placeholder="Что нового?"></textarea>
+        <button id="send-btn">Опубликовать пост</button>
+        <button id="logout-btn" style="border:none; color:#8892b0; font-size: 0.8rem;">Выйти</button>
+        
+        <div id="admin-tools" class="hidden" style="margin-top: 20px; border-top: 1px solid #233554; padding-top: 10px;">
+            <h4 style="color: #f57d7d;">Управление пользователями</h4>
+            <div id="users-list"></div>
+        </div>
+    </div>
+
+    <div id="posts"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDoc, getDocs, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDwM_poO1R-3JM5DScKOrRHeXinAxQzYjA",
+        authDomain: "slava211-66690.firebaseapp.com",
+        projectId: "slava211-66690",
+        storageBucket: "slava211-66690.firebasestorage.app",
+        messagingSenderId: "948890609520",
+        appId: "1:948890609520:web:1fb7e20e939b7040e211b5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const ADMIN_EMAIL = "malyareinkko162@yandex.ru"; // ЗАМЕНИ НА СВОЮ
+
+    // Регистрация
+    document.getElementById('reg-btn').onclick = async () => {
+        const name = document.getElementById('user-name').value;
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('pass').value;
+        if (!name) return alert("Введите имя!");
+        try {
+            const res = await createUserWithEmailAndPassword(auth, email, pass);
+            await setDoc(doc(db, "users", res.user.uid), { name, email });
+        } catch (e) { alert(e.message); }
+    };
+
+    // Вход/Выход
+    document.getElementById('login-btn').onclick = () => {
+        signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('pass').value).catch(e => alert(e.message));
+    };
+    document.getElementById('logout-btn').onclick = () => signOut(auth);
+
+    // Следим за состоянием
+    onAuthStateChanged(auth, async (user) => {
+        const authSec = document.getElementById('auth-section');
+        const userPan = document.getElementById('user-panel');
+        const adminTools = document.getElementById('admin-tools');
+
+        if (user) {
+            authSec.classList.add('hidden');
+            userPan.classList.remove('hidden');
+            
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            const name = userDoc.exists() ? userDoc.data().name : "Аноним";
+            document.getElementById('welcome-msg').innerHTML = `Привет, <b>${name}</b>!`;
+
+            if (user.email === ADMIN_EMAIL) {
+                adminTools.classList.remove('hidden');
+                loadUsersList();
+            }
+        } else {
+            authSec.classList.remove('hidden');
+            userPan.classList.add('hidden');
+            adminTools.classList.add('hidden');
+        }
+    });
+
+    // Отправка поста
+    document.getElementById('send-btn').onclick = async () => {
+        const text = document.getElementById('post-text').value;
+        if (!text) return;
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+        await addDoc(collection(db, "posts"), {
+            content: text,
+            author: userDoc.data().name,
+            time: serverTimestamp()
+        });
+        document.getElementById('post-text').value = "";
+    };
+
+    // Удаление пользователя (только данные из Firestore)
+    window.removeUser = async (userId) => {
+        if(confirm("Удалить пользователя из базы?")) {
+            await deleteDoc(doc(db, "users", userId));
+            loadUsersList();
+        }
+    };
+
+    // Загрузка списка пользователей для админа
+    async function loadUsersList() {
+        const list = document.getElementById('users-list');
+        const snap = await getDocs(collection(db, "users"));
+        list.innerHTML = "";
+        snap.forEach(u => {
+            if(u.data().email !== ADMIN_EMAIL) {
+                list.innerHTML += `<div style="margin-bottom:5px;">${u.data().name} (${u.data().email}) <button class="admin-btn" onclick="removeUser('${u.id}')">Удалить</button></div>`;
+            }
+        });
+    }
+
+    // Лента
+    onSnapshot(query(collection(db, "posts"), orderBy("time", "desc")), (snap) => {
+        const cont = document.getElementById('posts');
+        cont.innerHTML = "";
+        snap.forEach(s => {
+            const p = s.data();
+            const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+            cont.innerHTML += `
+                <div class="post">
+                    <div class="author-name">${p.author}</div>
+                    <div>${p.content}</div>
+                    <div class="post-time">${p.time ? p.time.toDate().toLocaleString() : "..."}</div>
+                    ${isAdmin ? `<button class="admin-btn" onclick="deletePost('${s.id}')">Удалить пост</button>` : ""}
+                </div>`;
+        });
+    });
+
+    window.deletePost = (id) => deleteDoc(doc(db, "posts", id));
+</script>
+</body>
+</html>
