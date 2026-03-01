@@ -51,7 +51,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDoc, getDocs, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDoc, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDwM_poO1R-3JM5DScKOrRHeXinAxQzYjA",
@@ -66,29 +66,48 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    const ADMIN_EMAIL = "malyareinkko162@yandex.ru", 
-    "artemu432p@gmail.com",
-    "test@gmail.com"
-
-    // Регистрация
+    // Список админов
+// Добавляй сюда любые почты через запятую в кавычках
+const ADMIN_EMAILS = [
+    "malyareinkko162@yandex.ru", 
+    "artemuchoka" 
+];
+    // --- РЕГИСТРАЦИЯ ---
     document.getElementById('reg-btn').onclick = async () => {
-        const name = document.getElementById('user-name').value;
-        const email = document.getElementById('email').value;
-        const pass = document.getElementById('pass').value;
-        if (!name) return alert("Введите имя!");
+        const name = document.getElementById('user-name').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const pass = document.getElementById('pass').value.trim();
+
+        if (!name || !email || pass.length < 6) {
+            return alert("Заполни все поля! Пароль минимум 6 символов.");
+        }
+
         try {
             const res = await createUserWithEmailAndPassword(auth, email, pass);
-            await setDoc(doc(db, "users", res.user.uid), { name, email });
-        } catch (e) { alert(e.message); }
+            // Сразу создаем запись в базе
+            await setDoc(doc(db, "users", res.user.uid), {
+                name: name,
+                email: email,
+                role: ADMIN_EMAILS.includes(email) ? "admin" : "user"
+            });
+            alert("Аккаунт создан!");
+        } catch (e) {
+            if (e.code === 'auth/email-already-in-use') alert("Эта почта уже занята!");
+            else alert("Ошибка: " + e.message);
+        }
     };
 
-    // Вход/Выход
+    // --- ВХОД ---
     document.getElementById('login-btn').onclick = () => {
-        signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('pass').value).catch(e => alert(e.message));
+        const email = document.getElementById('email').value.trim();
+        const pass = document.getElementById('pass').value.trim();
+        signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Ошибка входа: " + e.message));
     };
+
+    // --- ВЫХОД ---
     document.getElementById('logout-btn').onclick = () => signOut(auth);
 
-    // Следим за состоянием
+    // --- МОНИТОРИНГ СОСТОЯНИЯ ---
     onAuthStateChanged(auth, async (user) => {
         const authSec = document.getElementById('auth-section');
         const userPan = document.getElementById('user-panel');
@@ -98,13 +117,13 @@
             authSec.classList.add('hidden');
             userPan.classList.remove('hidden');
             
+            // Получаем имя из базы
             const userDoc = await getDoc(doc(db, "users", user.uid));
-            const name = userDoc.exists() ? userDoc.data().name : "Аноним";
+            const name = userDoc.exists() ? userDoc.data().name : "Пользователь";
             document.getElementById('welcome-msg').innerHTML = `Привет, <b>${name}</b>!`;
 
-            if (user.email === ADMIN_EMAIL) {
+            if (ADMIN_EMAILS.includes(user.email)) {
                 adminTools.classList.remove('hidden');
-                loadUsersList();
             }
         } else {
             authSec.classList.remove('hidden');
@@ -113,58 +132,43 @@
         }
     });
 
-    // Отправка поста
+    // --- ОТПРАВКА ПОСТА ---
     document.getElementById('send-btn').onclick = async () => {
-        const text = document.getElementById('post-text').value;
-        if (!text) return;
-        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-        await addDoc(collection(db, "posts"), {
-            content: text,
-            author: userDoc.data().name,
-            time: serverTimestamp()
-        });
-        document.getElementById('post-text').value = "";
+        const text = document.getElementById('post-text').value.trim();
+        if (!text || !auth.currentUser) return;
+
+        try {
+            const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+            const authorName = userDoc.exists() ? userDoc.data().name : "Аноним";
+
+            await addDoc(collection(db, "posts"), {
+                content: text,
+                author: authorName,
+                time: serverTimestamp()
+            });
+            document.getElementById('post-text').value = "";
+        } catch (e) { alert("Ошибка при публикации!"); }
     };
 
-    // Удаление пользователя (только данные из Firestore)
-    window.removeUser = async (userId) => {
-        if(confirm("Удалить пользователя из базы?")) {
-            await deleteDoc(doc(db, "users", userId));
-            loadUsersList();
-        }
-    };
-
-    // Загрузка списка пользователей для админа
-    async function loadUsersList() {
-        const list = document.getElementById('users-list');
-        const snap = await getDocs(collection(db, "users"));
-        list.innerHTML = "";
-        snap.forEach(u => {
-            if(u.data().email !== ADMIN_EMAIL) {
-                list.innerHTML += `<div style="margin-bottom:5px;">${u.data().name} (${u.data().email}) <button class="admin-btn" onclick="removeUser('${u.id}')">Удалить</button></div>`;
-            }
-        });
-    }
-
-    // Лента
+    // --- ЛЕНТА ПОСТОВ ---
     onSnapshot(query(collection(db, "posts"), orderBy("time", "desc")), (snap) => {
         const cont = document.getElementById('posts');
         cont.innerHTML = "";
         snap.forEach(s => {
             const p = s.data();
-            const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+            const isAdmin = auth.currentUser && ADMIN_EMAILS.includes(auth.currentUser.email);
+            const date = p.time ? p.time.toDate().toLocaleString() : "...";
             cont.innerHTML += `
                 <div class="post">
                     <div class="author-name">${p.author}</div>
                     <div>${p.content}</div>
-                    <div class="post-time">${p.time ? p.time.toDate().toLocaleString() : "..."}</div>
-                    ${isAdmin ? `<button class="admin-btn" onclick="deletePost('${s.id}')">Удалить пост</button>` : ""}
+                    <div class="post-time">${date}</div>
+                    ${isAdmin ? `<button class="admin-btn" onclick="deletePost('${s.id}')">Удалить</button>` : ""}
                 </div>`;
         });
     });
 
-    window.deletePost = (id) => deleteDoc(doc(db, "posts", id));
+    window.deletePost = (id) => { if(confirm("Удалить пост?")) deleteDoc(doc(db, "posts", id)); };
 </script>
 </body>
-
 </html>
