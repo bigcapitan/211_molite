@@ -66,7 +66,9 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    const ADMIN_EMAIL = "malyareinkko162@yandex.ru"; // ЗАМЕНИ НА СВОЮ
+    const ADMIN_EMAIL = "malyareinkko162@yandex.ru", 
+    "artemu432p@gmail.com",
+    "test@gmail.com"
 
     // Регистрация
     document.getElementById('reg-btn').onclick = async () => {
@@ -164,4 +166,5 @@
     window.deletePost = (id) => deleteDoc(doc(db, "posts", id));
 </script>
 </body>
+
 </html>
